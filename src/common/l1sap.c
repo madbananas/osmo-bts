@@ -970,8 +970,10 @@ static int l1sap_ph_rach_ind(struct gsm_bts_trx *trx,
 	}
 
 	/* check for handover rach */
-	if (!L1SAP_IS_CHAN_RACH(rach_ind->chan_nr))
-		return l1sap_handover_rach(trx, l1sap, rach_ind);
+	if (!L1SAP_IS_CHAN_RACH(rach_ind->chan_nr)) {
+		return 0;
+	//	return l1sap_handover_rach(trx, l1sap, rach_ind);
+	}
 
 	/* check for packet access */
 	if ((trx == bts->c0 && L1SAP_IS_PACKET_RACH(rach_ind->ra)) ||
