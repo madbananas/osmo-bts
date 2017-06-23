@@ -476,12 +476,16 @@ static int l1sap_info_meas_ind(struct gsm_bts_trx *trx,
 	struct bts_ul_meas ulm;
 	struct gsm_lchan *lchan;
 
-	DEBUGP(DL1P, "MPH_INFO meas ind chan_nr=0x%02x\n",
-		info_meas_ind->chan_nr);
-
 	lchan = get_active_lchan_by_chan_nr(trx, info_meas_ind->chan_nr);
-	if (!lchan)
+	if (!lchan) {
+		LOGP(DL1P, LOGL_ERROR, "No lchan for MPH INFO MEAS IND (chan_nr=%u)\n",
+		     info_meas_ind->chan_nr);
 		return 0;
+	}
+
+	DEBUGP(DL1P, "%s MPH_INFO meas ind, ta_offs_qbits=%d, ber10k=%d, inv_rssi=%u\n",
+		gsm_lchan_name(lchan), info_meas_ind->ta_offs_qbits,
+		info_meas_ind->ber10k, info_meas_ind->inv_rssi);
 
 	/* in the GPRS case we are not interested in measurement
 	 * processing.  The PCU will take care of it */
@@ -703,8 +707,10 @@ static int l1sap_ph_rts_ind(struct gsm_bts_trx *trx,
 			memcpy(p, fill_frame, GSM_MACBLOCK_LEN);
 	} else if (!(chan_nr & 0x80)) { /* only TCH/F, TCH/H, SDCCH/4 and SDCCH/8 have C5 bit cleared */
 		lchan = get_active_lchan_by_chan_nr(trx, chan_nr);
-		if (!lchan)
+		if (!lchan) {
+			LOGP(DL1P, LOGL_ERROR, "No lchan for PH-RTS.ind (chan_nr=%u)\n", chan_nr);
 			return 0;
+		}
 		if (L1SAP_IS_LINK_SACCH(link_id)) {
 			p = msgb_put(msg, GSM_MACBLOCK_LEN);
 			/* L1-header, if not set/modified by layer 1 */
@@ -755,8 +761,8 @@ static int l1sap_ph_rts_ind(struct gsm_bts_trx *trx,
 			memcpy(p, fill_frame, GSM_MACBLOCK_LEN);
 	}
 
-	DEBUGP(DL1P, "Tx PH-DATA.req %02u/%02u/%02u chan_nr=%d link_id=%d\n",
-		g_time.t1, g_time.t2, g_time.t3, chan_nr, link_id);
+	DEBUGP(DL1P, "Tx PH-DATA.req %s chan_nr=%d link_id=%d\n",
+		dump_gsmtime(&g_time), chan_nr, link_id);
 
 	l1sap_down(trx, l1sap);
 
@@ -803,12 +809,14 @@ static int l1sap_tch_rts_ind(struct gsm_bts_trx *trx,
 
 	gsm_fn2gsmtime(&g_time, fn);
 
-	DEBUGP(DL1P, "Rx TCH-RTS.ind %02u/%02u/%02u chan_nr=%d\n",
-		g_time.t1, g_time.t2, g_time.t3, chan_nr);
+	DEBUGP(DL1P, "Rx TCH-RTS.ind %s chan_nr=%d\n",
+		dump_gsmtime(&g_time), chan_nr);
 
 	lchan = get_active_lchan_by_chan_nr(trx, chan_nr);
-	if (!lchan)
+	if (!lchan) {
+		LOGP(DL1P, LOGL_ERROR, "No lchan for PH-RTS.ind (chan_nr=%u)\n", chan_nr);
 		return 0;
+	}
 
 	if (!lchan->loopback && lchan->abis_ip.rtp_socket) {
 		osmo_rtp_socket_poll(lchan->abis_ip.rtp_socket);
@@ -857,8 +865,8 @@ static int l1sap_tch_rts_ind(struct gsm_bts_trx *trx,
 	resp_l1sap->u.tch.fn = fn;
 	resp_l1sap->u.tch.marker = marker;
 
-	DEBUGP(DL1P, "Tx TCH.req %02u/%02u/%02u chan_nr=%d\n",
-		g_time.t1, g_time.t2, g_time.t3, chan_nr);
+	DEBUGP(DL1P, "Tx TCH.req %s chan_nr=%d\n",
+		dump_gsmtime(&g_time), chan_nr);
 
 	l1sap_down(trx, resp_l1sap);
 
@@ -960,8 +968,8 @@ static int l1sap_ph_data_ind(struct gsm_bts_trx *trx,
 
 	gsm_fn2gsmtime(&g_time, fn);
 
-	DEBUGP(DL1P, "Rx PH-DATA.ind %02u/%02u/%02u chan_nr=%d link_id=%d\n",
-		g_time.t1, g_time.t2, g_time.t3, chan_nr, link_id);
+	LOGP(DL1P, LOGL_INFO, "Rx PH-DATA.ind %s chan_nr=%d link_id=%d len=%d\n",
+		dump_gsmtime(&g_time), chan_nr, link_id, len);
 
 	if (ts_is_pdch(&trx->ts[tn])) {
 		lchan = get_lchan_by_chan_nr(trx, chan_nr);
@@ -1001,8 +1009,10 @@ static int l1sap_ph_data_ind(struct gsm_bts_trx *trx,
 	}
 
 	lchan = get_active_lchan_by_chan_nr(trx, chan_nr);
-	if (!lchan)
+	if (!lchan) {
+		LOGP(DL1P, LOGL_ERROR, "No lchan for chan_nr=%d\n", chan_nr);
 		return 0;
+	}
 
 	/* bad frame */
 	if (len == 0) {
@@ -1068,8 +1078,10 @@ static int l1sap_tch_ind(struct gsm_bts_trx *trx, struct osmo_phsap_prim *l1sap,
 		g_time.t1, g_time.t2, g_time.t3, chan_nr);
 
 	lchan = get_active_lchan_by_chan_nr(trx, chan_nr);
-	if (!lchan)
+	if (!lchan) {
+		LOGP(DL1P, LOGL_ERROR, "No lchan for TCH.ind (chan_nr=%u)\n", chan_nr);
 		return 0;
+	}
 
 	msgb_pull(msg, sizeof(*l1sap));
 
