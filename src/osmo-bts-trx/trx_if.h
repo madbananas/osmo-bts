@@ -4,8 +4,6 @@
 extern int transceiver_available;
 extern const char *local_ip;
 extern const char *remote_ip;
-extern int settsc_enabled;
-extern int setbsic_enabled;
 
 struct trx_l1h;
 

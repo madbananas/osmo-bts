@@ -45,6 +45,7 @@ struct phy_link {
 
 			uint32_t clock_advance;
 			uint32_t rts_advance;
+			bool use_legacy_setbsic;
 		} osmotrx;
 		struct {
 			/* MAC address of the PHY */
