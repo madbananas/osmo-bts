@@ -2,8 +2,6 @@
 #define TRX_IF_H
 
 extern int transceiver_available;
-extern const char *local_ip;
-extern const char *remote_ip;
 
 struct trx_l1h;
 
