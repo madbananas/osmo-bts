@@ -477,6 +477,8 @@ static int ph_data_req(struct gsm_bts_trx *trx, struct msgb *msg,
 	int len;
 	int rc;
 
+	printf("--------------> ph_data_req()\n");
+
 	if (!msg) {
 		LOGP(DL1C, LOGL_FATAL, "L1SAP PH-DATA.req without msg. "
 		     "Please fix!\n");
@@ -938,6 +940,8 @@ static int handle_ph_readytosend_ind(struct octphy_hdl *fl1,
 	struct msgb *resp_msg;
 	tOCTVC1_GSM_MSG_TRX_REQUEST_LOGICAL_CHANNEL_DATA_CMD *data_req;
 
+	printf("--------------> handle_ph_readytosend_ind()\n");
+	
 	/* Retrive the data */
 	fn = evt->ulFrameNumber;
 	ts_num = (uint8_t) evt->LchId.byTimeslotNb;

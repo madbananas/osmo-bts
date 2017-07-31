@@ -373,6 +373,8 @@ static int lchan_act_compl_cb(struct octphy_hdl *fl1, struct msgb *resp, void *d
 	/* in a completion call-back, we take msgb ownership and must
 	 * release it before returning */
 
+	printf("=====================//////////////> lchan_act_compl_cb()\n");
+	
 	mOCTVC1_GSM_MSG_TRX_ACTIVATE_LOGICAL_CHANNEL_RSP_SWAP(ar);
 	trx = trx_by_l1h(fl1, ar->TrxId.byTrxId);
 
@@ -429,6 +431,8 @@ static int mph_send_activate_req(struct gsm_lchan *lchan, struct sapi_cmd *cmd)
 	struct msgb *msg = l1p_msgb_alloc();
 	tOCTVC1_GSM_MSG_TRX_ACTIVATE_LOGICAL_CHANNEL_CMD *lac;
 
+	printf("=====================//////////////> mph_send_activate_req()\n");
+	
 	lac = (tOCTVC1_GSM_MSG_TRX_ACTIVATE_LOGICAL_CHANNEL_CMD *)
 			msgb_put(msg, sizeof(*lac));
 	l1if_fill_msg_hdr(&lac->Header, msg, fl1h, cOCTVC1_MSG_TYPE_COMMAND,
@@ -1554,7 +1558,7 @@ static int ts_connect_as(struct gsm_bts_trx_ts *ts,
 	l1if_fill_msg_hdr(&oc->Header, msg, fl1h, cOCTVC1_MSG_TYPE_COMMAND,
 			  cOCTVC1_GSM_MSG_TRX_ACTIVATE_PHYSICAL_CHANNEL_CID);
 
-	printf("===============================================#####> ts_connect_as()\n");
+	printf("===============================================#####> ts_connect_as(), pchan=%u\n", pchan);
 	
 	oc->TrxId.byTrxId = pinst->u.octphy.trx_id;
 	oc->PchId.byTimeslotNb = ts->nr;
@@ -1568,9 +1572,11 @@ static int ts_connect_as(struct gsm_bts_trx_ts *ts,
 	case cOCTVC1_GSM_LOGICAL_CHANNEL_COMBINATION_ENUM_TCHF_FACCHF_SACCHTF:
 	case cOCTVC1_GSM_LOGICAL_CHANNEL_COMBINATION_ENUM_PDTCHF_PACCHF_PTCCHF:
 		oc->ulPayloadType = cOCTVC1_GSM_PAYLOAD_TYPE_ENUM_FULL_RATE;
+		printf("===============================================#####> cOCTVC1_GSM_PAYLOAD_TYPE_ENUM_FULL_RATE\n");
 		break;
 	case cOCTVC1_GSM_LOGICAL_CHANNEL_COMBINATION_ENUM_TCHH_FACCHH_SACCHTH:
 		oc->ulPayloadType = cOCTVC1_GSM_PAYLOAD_TYPE_ENUM_HALF_RATE;
+		printf("===============================================#####> cOCTVC1_GSM_PAYLOAD_TYPE_ENUM_HALF_RATE\n");
 		break;
 	}
 
@@ -1818,7 +1824,7 @@ int bts_model_ts_disconnect(struct gsm_bts_trx_ts *ts)
 int bts_model_ts_connect(struct gsm_bts_trx_ts *ts,
 			 enum gsm_phys_chan_config as_pchan)
 {
-	printf("==================================================> bts_model_ts_connect()\n");
+	printf("==================================================> bts_model_ts_connect(), pchan=%u\n", as_pchan);
 //	return bts_model_ts_connect_dummy(ts, as_pchan);
 	return ts_connect_as(ts, as_pchan, ts_connect_cb, NULL);
 
