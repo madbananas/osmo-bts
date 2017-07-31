@@ -194,9 +194,9 @@ int lchan_new_ul_meas(struct gsm_lchan *lchan, struct bts_ul_meas *ulm)
 	}
 
 	if (lchan->meas.num_ul_meas >= ARRAY_SIZE(lchan->meas.uplink)) {
-		LOGP(DMEAS, LOGL_NOTICE,
-		     "%s no space for uplink measurement, num_ul_meas=%d\n",
-		     gsm_lchan_name(lchan), lchan->meas.num_ul_meas);
+//		LOGP(DMEAS, LOGL_NOTICE,
+//		     "%s no space for uplink measurement, num_ul_meas=%d\n",
+//		     gsm_lchan_name(lchan), lchan->meas.num_ul_meas);
 		return -ENOSPC;
 	}
 

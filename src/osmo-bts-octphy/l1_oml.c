@@ -1418,6 +1418,8 @@ static int ts_connect(struct gsm_bts_trx_ts *ts)
 	l1if_fill_msg_hdr(&oc->Header, msg, fl1h, cOCTVC1_MSG_TYPE_COMMAND,
 			  cOCTVC1_GSM_MSG_TRX_ACTIVATE_PHYSICAL_CHANNEL_CID);
 
+	printf("====================================================> ts_connect()\n");
+	
 	oc->TrxId.byTrxId = pinst->u.octphy.trx_id;
 	oc->PchId.byTimeslotNb = ts->nr;
 	oc->ulChannelType = pchan_to_logChComb[ts->pchan];
@@ -1442,6 +1444,147 @@ static int ts_connect(struct gsm_bts_trx_ts *ts)
 
 	return l1if_req_compl(fl1h, msg, pchan_act_compl_cb, NULL);
 }
+
+/* Dynamic timeslots: Disconnect callback, reports completed disconnection to higher layers */
+static int ts_disconnect_cb(struct octphy_hdl *fl1, struct msgb *resp, void *data)
+
+{
+	printf("===============================================#####> ts_disconnect_cb()\n");
+	
+	tOCTVC1_GSM_MSG_TRX_DEACTIVATE_PHYSICAL_CHANNEL_RSP *ar =
+		(tOCTVC1_GSM_MSG_TRX_DEACTIVATE_PHYSICAL_CHANNEL_RSP *) resp->l2h;
+	uint8_t ts_nr;
+	struct gsm_bts_trx *trx;
+	struct gsm_bts_trx_ts *ts;
+
+
+	trx = trx_by_l1h(fl1, ar->TrxId.byTrxId);
+	ts_nr = ar->PchId.byTimeslotNb;
+	ts = &trx->ts[ts_nr];
+
+
+
+	
+#if 0	
+	GsmL1_Prim_t *l1p = msgb_l1prim(l1_msg);
+	GsmL1_MphDisconnectCnf_t *cnf = &l1p->u.mphDisconnectCnf;
+	struct gsm_bts_trx_ts *ts = &trx->ts[cnf->u8Tn];
+	OSMO_ASSERT(cnf->u8Tn < TRX_NR_TS);
+
+	LOGP(DL1C, LOGL_DEBUG, "%s Rx mphDisconnectCnf\n",
+	     gsm_lchan_name(ts->lchan));
+#endif
+	
+	cb_ts_disconnected(ts);
+
+	return 0;
+}
+
+/* Dynamic timeslots: Connect  callback, reports completed disconnection to higher layers */
+static int ts_connect_cb(struct octphy_hdl *fl1, struct msgb *resp, void *data)
+{
+	tOCTVC1_GSM_MSG_TRX_ACTIVATE_PHYSICAL_CHANNEL_RSP *ar =
+		(tOCTVC1_GSM_MSG_TRX_ACTIVATE_PHYSICAL_CHANNEL_RSP *) resp->l2h;
+	uint8_t ts_nr;
+	struct gsm_bts_trx *trx;
+	struct gsm_bts_trx_ts *ts;
+//	struct gsm_abis_mo *mo;
+
+	printf("===============================================#####> ts_connect_cb()\n");
+
+	/* in a completion call-back, we take msgb ownership and must
+	 * release it before returning */
+
+//	return 0;
+
+	mOCTVC1_GSM_MSG_TRX_ACTIVATE_PHYSICAL_CHANNEL_RSP_SWAP(ar);
+	trx = trx_by_l1h(fl1, ar->TrxId.byTrxId);
+	ts_nr = ar->PchId.byTimeslotNb;
+	OSMO_ASSERT(ts_nr <= ARRAY_SIZE(trx->ts));
+
+	ts = &trx->ts[ts_nr];
+
+	LOGP(DL1C, LOGL_INFO, "PCHAN-ACT.conf(trx=%u, ts=%u, chcomb=%u) = %s\n",
+		ts->trx->nr, ts->nr, ts->pchan,
+		octvc1_rc2string(ar->Header.ulReturnCode));
+
+	if (ar->Header.ulReturnCode != cOCTVC1_RC_OK) {
+		LOGP(DL1C, LOGL_ERROR,
+		     "PCHAN-ACT failed: %s\n\n",
+		     octvc1_rc2string(ar->Header.ulReturnCode));
+		LOGP(DL1C, LOGL_ERROR, "Exiting... \n\n");
+		msgb_free(resp);
+		exit(-1);
+	}
+
+	trx = ts->trx;
+//	mo = &trx->ts[ar->PchId.byTimeslotNb].mo;
+
+	msgb_free(resp);
+
+	cb_ts_connected(ts);
+	
+	return 0;
+}
+
+static int ts_connect_as(struct gsm_bts_trx_ts *ts,
+			 enum gsm_phys_chan_config pchan,
+			 l1if_compl_cb *cb, void *data)
+{
+	struct phy_instance *pinst = trx_phy_instance(ts->trx);
+	struct octphy_hdl *fl1h = pinst->phy_link->u.octphy.hdl;
+	struct msgb *msg = l1p_msgb_alloc();
+	tOCTVC1_GSM_MSG_TRX_ACTIVATE_PHYSICAL_CHANNEL_CMD *oc =
+		(tOCTVC1_GSM_MSG_TRX_ACTIVATE_PHYSICAL_CHANNEL_CMD *) oc;
+
+
+
+	if (pchan == GSM_PCHAN_TCH_F_PDCH
+	    || pchan == GSM_PCHAN_TCH_F_TCH_H_PDCH) {
+		LOGP(DL1C, LOGL_ERROR,
+		     "%s Requested TS connect as %s,"
+		     " expected a specific pchan instead\n",
+		     gsm_ts_and_pchan_name(ts), gsm_pchan_name(pchan));
+		exit(1);
+		return -EINVAL;
+	}
+
+	
+	oc = (tOCTVC1_GSM_MSG_TRX_ACTIVATE_PHYSICAL_CHANNEL_CMD *) msgb_put(msg, sizeof(*oc));
+	l1if_fill_msg_hdr(&oc->Header, msg, fl1h, cOCTVC1_MSG_TYPE_COMMAND,
+			  cOCTVC1_GSM_MSG_TRX_ACTIVATE_PHYSICAL_CHANNEL_CID);
+
+	printf("===============================================#####> ts_connect_as()\n");
+	
+	oc->TrxId.byTrxId = pinst->u.octphy.trx_id;
+	oc->PchId.byTimeslotNb = ts->nr;
+//	oc->ulChannelType = pchan_to_logChComb[ts->pchan];
+	oc->ulChannelType = pchan_to_logChComb[pchan];
+
+	/* TODO: how should we know the payload type here?  Also, why
+	 * would the payload type have to be the same for both halves of
+	 * a TCH/H ? */
+	switch (oc->ulChannelType) {
+	case cOCTVC1_GSM_LOGICAL_CHANNEL_COMBINATION_ENUM_TCHF_FACCHF_SACCHTF:
+	case cOCTVC1_GSM_LOGICAL_CHANNEL_COMBINATION_ENUM_PDTCHF_PACCHF_PTCCHF:
+		oc->ulPayloadType = cOCTVC1_GSM_PAYLOAD_TYPE_ENUM_FULL_RATE;
+		break;
+	case cOCTVC1_GSM_LOGICAL_CHANNEL_COMBINATION_ENUM_TCHH_FACCHH_SACCHTH:
+		oc->ulPayloadType = cOCTVC1_GSM_PAYLOAD_TYPE_ENUM_HALF_RATE;
+		break;
+	}
+
+	LOGP(DL1C, LOGL_INFO, "PCHAN-ACT.req(trx=%u, ts=%u, chcomb=%u)\n",
+//		ts->trx->nr, ts->nr, ts->pchan);
+     		ts->trx->nr, ts->nr, pchan);
+
+	mOCTVC1_GSM_MSG_TRX_ACTIVATE_PHYSICAL_CHANNEL_CMD_SWAP(oc);
+
+	return l1if_req_compl(fl1h, msg, cb, NULL);
+}
+
+
+
 
 /***********************************************************************
  * BTS MODEL CALLBACKS
@@ -1612,13 +1755,73 @@ int bts_model_change_power(struct gsm_bts_trx *trx, int p_trxout_mdBm)
 	return 0;
 }
 
+int bts_model_ts_disconnect_dummy(struct gsm_bts_trx_ts *ts)
+{
+	printf("===========================================> bts_model_ts_disconnect_dummy()\n");
+	cb_ts_disconnected(ts);
+	return 0;
+
+}
+
+int bts_model_ts_connect_dummy(struct gsm_bts_trx_ts *ts,
+			 enum gsm_phys_chan_config as_pchan)
+{
+	printf("===========================================> bts_model_ts_connect_dummy()\n");
+	cb_ts_connected(ts);
+	return 0;
+}
+
+
 int bts_model_ts_disconnect(struct gsm_bts_trx_ts *ts)
 {
-	return -ENOTSUP;
+	printf("==================================================> bts_model_ts_disconnect()\n");
+//	return bts_model_ts_disconnect_dummy(ts);
+
+	struct phy_instance *pinst = trx_phy_instance(ts->trx);
+	struct octphy_hdl *fl1h = pinst->phy_link->u.octphy.hdl;
+	struct msgb *msg = l1p_msgb_alloc();
+	tOCTVC1_GSM_MSG_TRX_DEACTIVATE_PHYSICAL_CHANNEL_CMD *oc =
+		(tOCTVC1_GSM_MSG_TRX_DEACTIVATE_PHYSICAL_CHANNEL_CMD *) oc;
+
+	oc = (tOCTVC1_GSM_MSG_TRX_DEACTIVATE_PHYSICAL_CHANNEL_CMD *) msgb_put(msg, sizeof(*oc));
+	l1if_fill_msg_hdr(&oc->Header, msg, fl1h, cOCTVC1_MSG_TYPE_COMMAND,
+			  cOCTVC1_GSM_MSG_TRX_DEACTIVATE_PHYSICAL_CHANNEL_CID);
+
+	
+	oc->TrxId.byTrxId = pinst->u.octphy.trx_id;
+	oc->PchId.byTimeslotNb = ts->nr;
+//	oc->ulChannelType = pchan_to_logChComb[ts->pchan];
+
+	/* TODO: how should we know the payload type here?  Also, why
+	 * would the payload type have to be the same for both halves of
+	 * a TCH/H ? */
+//	switch (oc->ulChannelType) {
+//	case cOCTVC1_GSM_LOGICAL_CHANNEL_COMBINATION_ENUM_TCHF_FACCHF_SACCHTF:
+//	case cOCTVC1_GSM_LOGICAL_CHANNEL_COMBINATION_ENUM_PDTCHF_PACCHF_PTCCHF:
+//		oc->ulPayloadType = cOCTVC1_GSM_PAYLOAD_TYPE_ENUM_FULL_RATE;
+//		break;
+//	case cOCTVC1_GSM_LOGICAL_CHANNEL_COMBINATION_ENUM_TCHH_FACCHH_SACCHTH:
+//		oc->ulPayloadType = cOCTVC1_GSM_PAYLOAD_TYPE_ENUM_HALF_RATE;
+//		break;
+//	}
+
+	LOGP(DL1C, LOGL_INFO, "PCHAN-DEACT.req(trx=%u, ts=%u, chcomb=%u)\n",
+		ts->trx->nr, ts->nr, ts->pchan);
+
+	mOCTVC1_GSM_MSG_TRX_DEACTIVATE_PHYSICAL_CHANNEL_CMD_SWAP(oc);
+
+	return l1if_req_compl(fl1h, msg, ts_disconnect_cb, NULL);
+
+
 }
 
 int bts_model_ts_connect(struct gsm_bts_trx_ts *ts,
 			 enum gsm_phys_chan_config as_pchan)
 {
-	return -ENOTSUP;
+	printf("==================================================> bts_model_ts_connect()\n");
+//	return bts_model_ts_connect_dummy(ts, as_pchan);
+	return ts_connect_as(ts, as_pchan, ts_connect_cb, NULL);
+
 }
+
+
